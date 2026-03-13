@@ -1,0 +1,19 @@
+{
+  "name": "borderland-minimal",
+  "max_ticks": 20,
+  "actions": {
+    "gather": {"cost": 1, "params": ["resource"]},
+    "rest": {"cost": 0, "params": []}
+  },
+  "initial_state": {
+    "tick": 0,
+    "resources": {
+      "start": {"food": 5}
+    },
+    "agents": {
+      "a1": {"energy": 5, "location": "start", "inventory": {}},
+      "a2": {"energy": 5, "location": "start", "inventory": {}}
+    }
+  },
+  "metrics": ["survival", "wealth"]
+}
