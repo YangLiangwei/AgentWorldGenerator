@@ -1,0 +1,15 @@
+{
+  "version": "0.2",
+  "world": {
+    "name": "restaurant-sim",
+    "max_ticks": 50
+  },
+  "entities": [
+    {"id": "waiter_1", "type": "agent", "location": "hall", "energy": 8, "traits": {"job": "waiter"}},
+    {"id": "customer_1", "type": "agent", "location": "hall", "energy": 6, "traits": {"job": "customer"}}
+  ],
+  "resource_nodes": [
+    {"location": "hall", "resources": {"food": 5}},
+    {"location": "kitchen", "resources": {"food": 20}}
+  ]
+}

@@ -17,7 +17,11 @@ Automatic Agent Simulation World Generator (MVP scaffold).
 
 `scenario text/dict -> Scene IR -> compiler -> WorldSpec -> Runtime`
 
-Current MVP provides dict->`WorldSpec` compilation in `simworld/compiler.py` with TODO hooks for NL->IR.
+Current MVP supports two compile paths in `simworld/compiler.py`:
+- v0.1 runtime dict (`initial_state` + `actions`)
+- v0.2 World DSL (`world` + `entities` + `resource_nodes`)
+
+It also includes a deterministic text->Scene IR draft helper (`draft_scene_ir_from_text`) for rapid prototyping.
 
 ## Quickstart
 
