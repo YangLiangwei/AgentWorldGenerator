@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 import json
 
 
@@ -12,6 +12,22 @@ class Event:
     action: str
     payload: Dict[str, Any]
     result: str
+
+
+@dataclass
+class Interaction:
+    actor_id: str
+    action: str
+    params: Dict[str, Any]
+    target_id: Optional[str] = None
+
+
+@dataclass
+class Outcome:
+    tick: int
+    interaction: Interaction
+    result: str
+    state_delta: Dict[str, Any]
 
 
 class EventLog:

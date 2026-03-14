@@ -33,6 +33,16 @@ python examples/run_minimal.py
 python -m unittest discover -s tests -q
 ```
 
+## Atomic World Model (core contract)
+
+SimWorld is being aligned to your four atomic primitives:
+- **Observe**: `runtime.observe(agent_id)`
+- **Object**: `runtime.get_object(object_id)`
+- **Interaction**: `events.Interaction`
+- **Outcome**: `events.Outcome` produced by runtime resolution
+
+Rule: outcomes are resolved by the engine, never self-reported by agents.
+
 ## Why this structure
 
 - Deterministic core for reproducibility.

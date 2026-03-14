@@ -41,6 +41,17 @@ class RuntimeTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             runtime.step_action("a1", "gather", {})
 
+    def test_object_and_outcome_atoms(self):
+        spec = _load_spec()
+        runtime = SimulationRuntime(spec)
+
+        obj = runtime.get_object("a1")
+        self.assertEqual(obj["kind"], "agent")
+
+        outcome = runtime.step_action("a1", "gather", {"resource": "food"})
+        self.assertIn("ok:", outcome.result)
+        self.assertIn("energy", outcome.state_delta)
+
 
 if __name__ == "__main__":
     unittest.main()
