@@ -1,3 +1,10 @@
 __pycache__/
 *.pyc
 .venv/
+.openclaw/
+AGENTS.md
+SOUL.md
+USER.md
+IDENTITY.md
+TOOLS.md
+HEARTBEAT.md
