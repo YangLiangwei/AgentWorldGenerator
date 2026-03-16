@@ -10,11 +10,25 @@ DEFAULT_ACTIONS = {
     "rest": {"cost": 0, "params": []},
 }
 
+ROLE_LIBRARY: Dict[str, Dict[str, Any]] = {
+    "operator": {"energy": 9, "traits": {"role": "operator"}},
+    "participant": {"energy": 8, "traits": {"role": "participant"}},
+    "manager": {"energy": 10, "traits": {"role": "manager"}},
+    "receptionist": {"energy": 9, "traits": {"role": "receptionist"}},
+    "cashier": {"energy": 8, "traits": {"role": "cashier"}},
+    "guide": {"energy": 9, "traits": {"role": "guide"}},
+    "doctor": {"energy": 9, "traits": {"role": "doctor"}},
+    "professor": {"energy": 9, "traits": {"role": "professor"}},
+    "student": {"energy": 8, "traits": {"role": "student"}},
+    "researcher": {"energy": 8, "traits": {"role": "researcher"}},
+}
+
 
 def _compile_from_world_dsl(scene: Dict[str, Any]) -> Dict[str, Any]:
     world = scene.get("world", {})
     entities: List[Dict[str, Any]] = scene.get("entities", [])
     resource_nodes: List[Dict[str, Any]] = scene.get("resource_nodes", [])
+    rules = scene.get("rules", {})
 
     agents: Dict[str, Dict[str, Any]] = {}
     for ent in entities:
@@ -33,6 +47,10 @@ def _compile_from_world_dsl(scene: Dict[str, Any]) -> Dict[str, Any]:
         loc = node["location"]
         resources[loc] = dict(node.get("resources", {}))
 
+    metrics = scene.get("metrics", ["survival", "wealth", "stability"])
+    if rules.get("queueing"):
+        metrics = [*metrics, "queue_latency"]
+
     return {
         "name": world.get("name", "generated-world"),
         "max_ticks": world.get("max_ticks", 100),
@@ -42,33 +60,77 @@ def _compile_from_world_dsl(scene: Dict[str, Any]) -> Dict[str, Any]:
             "resources": resources,
             "agents": agents,
         },
-        "metrics": scene.get("metrics", ["survival", "wealth", "stability"]),
+        "metrics": metrics,
+    }
+
+
+def _build_ir(world_name: str, zones: List[str], roles: List[str]) -> Dict[str, Any]:
+    entities: List[Dict[str, Any]] = []
+    resource_nodes: List[Dict[str, Any]] = []
+
+    for idx, role in enumerate(roles, start=1):
+        tpl = ROLE_LIBRARY.get(role, ROLE_LIBRARY["participant"])
+        entities.append(
+            {
+                "id": f"agent_{role}_{idx}",
+                "type": "agent",
+                "location": zones[min(idx - 1, len(zones) - 1)],
+                "energy": tpl["energy"],
+                "traits": dict(tpl["traits"]),
+            }
+        )
+
+    for z in zones:
+        resource_nodes.append({"location": z, "resources": {"food": 20}})
+
+    return {
+        "version": "0.3-ir",
+        "world": {"name": world_name, "max_ticks": 150},
+        "entities": entities,
+        "resource_nodes": resource_nodes,
+        "rules": {"queueing": False, "access_control": False},
+        "flows": [],
+        "constraints": [],
     }
 
 
 def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
     text = description.lower()
-    name = "service-world" if "service" in text or "餐厅" in description else "generated-world"
-    has_manager = "manager" in text or "经理" in description
 
-    entities = [
-        {"id": "agent_role_1", "type": "agent", "location": "zone_a", "traits": {"role": "operator"}},
-        {"id": "agent_role_2", "type": "agent", "location": "zone_a", "traits": {"role": "participant"}},
-    ]
-    if has_manager:
-        entities.append(
-            {"id": "agent_manager_1", "type": "agent", "location": "control", "traits": {"role": "manager"}}
+    if any(k in text for k in ["hospital", "医院", "clinic"]):
+        ir = _build_ir(
+            world_name="hospital-world",
+            zones=["frontdesk", "cashier", "triage", "department_a", "department_b"],
+            roles=["receptionist", "cashier", "guide", "doctor", "participant"],
         )
+        ir["rules"]["queueing"] = True
+        ir["rules"]["access_control"] = True
+        ir["flows"] = ["checkin", "pay", "triage", "treat"]
+        ir["constraints"] = ["patients must checkin before treat", "triage required for department access"]
+        return ir
 
-    return {
-        "version": "0.2",
-        "world": {"name": name, "max_ticks": 120},
-        "entities": entities,
-        "resource_nodes": [
-            {"location": "zone_a", "resources": {"food": 20}},
-            {"location": "zone_b", "resources": {"food": 50}},
-        ],
-    }
+    if any(k in text for k in ["university", "大学", "lab", "课题组"]):
+        ir = _build_ir(
+            world_name="university-world",
+            zones=["admission", "lecture_hall", "lab_alpha", "lab_beta"],
+            roles=["professor", "student", "student", "researcher", "manager"],
+        )
+        ir["flows"] = ["enroll", "attend", "research"]
+        ir["constraints"] = ["lab access requires enrollment", "research needs advisor relation"]
+        return ir
+
+    if any(k in text for k in ["service", "餐厅", "cafe", "restaurant"]):
+        ir = _build_ir(
+            world_name="service-world",
+            zones=["hall", "counter", "kitchen"],
+            roles=["operator", "participant", "manager"],
+        )
+        ir["flows"] = ["order", "serve", "pay"]
+        return ir
+
+    ir = _build_ir(world_name="generated-world", zones=["zone_a", "zone_b"], roles=["operator", "participant"])
+    ir["flows"] = ["explore", "exchange"]
+    return ir
 
 
 def compile_scene(scene: Dict[str, Any]) -> WorldSpec:

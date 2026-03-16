@@ -33,6 +33,12 @@ python -m agentworld.cli.main generate "a university world with labs and student
 python -m agentworld.cli.main validate world.generated.json
 ```
 
+Current generator has deterministic IR presets for broad scene families:
+- hospital / clinic
+- university / lab
+- service / restaurant
+- generic fallback
+
 ## Notes
 
 - `simworld/*` modules are kept as compatibility shims.

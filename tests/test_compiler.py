@@ -15,10 +15,16 @@ class CompilerTests(unittest.TestCase):
         self.assertEqual(spec.name, "x")
         self.assertIn("a1", spec.initial_state.agents)
 
-    def test_draft_scene_ir_from_text(self):
+    def test_draft_scene_ir_from_text_service(self):
         ir = draft_scene_ir_from_text("service world with manager")
         spec = compile_scene(ir)
         self.assertGreaterEqual(len(spec.initial_state.agents), 2)
+
+    def test_draft_scene_ir_from_text_university(self):
+        ir = draft_scene_ir_from_text("a university world with labs and students")
+        self.assertEqual(ir["world"]["name"], "university-world")
+        spec = compile_scene(ir)
+        self.assertGreaterEqual(len(spec.initial_state.agents), 4)
 
 
 if __name__ == "__main__":

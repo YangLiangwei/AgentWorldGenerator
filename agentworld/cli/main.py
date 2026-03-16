@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ..compiler import compile_scene, draft_scene_ir_from_text
-from ..validators import validate_world_dict
+from ..validators import validate_world_report
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
@@ -37,15 +37,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     data = json.loads(Path(args.world).read_text())
-    issues = validate_world_dict(data)
-    if not issues:
-        print("validate: OK")
-        return 0
-    has_error = False
-    for issue in issues:
+    report = validate_world_report(data)
+    for issue in report.issues:
         print(f"[{issue.level}] {issue.message}")
-        has_error = has_error or issue.level == "error"
-    return 1 if has_error else 0
+    print(f"summary: ok={report.ok} errors={report.errors} warnings={report.warnings}")
+    return 0 if report.ok else 1
 
 
 def main() -> int:
