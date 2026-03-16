@@ -1,6 +1,6 @@
 import unittest
 
-from simworld.compiler import compile_scene, draft_scene_ir_from_text
+from agentworld.compiler import compile_scene, draft_scene_ir_from_text
 
 
 class CompilerTests(unittest.TestCase):

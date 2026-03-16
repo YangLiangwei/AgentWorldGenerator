@@ -3,11 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simworld"
-version = "0.1.0"
+name = "agentworldgenerator"
+version = "0.2.0"
 description = "Automatic Agent Simulation World Generator MVP"
 requires-python = ">=3.10"
 dependencies = []
+
+[project.scripts]
+awg = "agentworld.cli.main:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

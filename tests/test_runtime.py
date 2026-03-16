@@ -2,8 +2,8 @@ import json
 import unittest
 from pathlib import Path
 
-from simworld.compiler import compile_scene
-from simworld.runtime import SimulationRuntime, ValidationError
+from agentworld.compiler import compile_scene
+from agentworld.core.runtime import SimulationRuntime, ValidationError
 
 
 def _load_spec():

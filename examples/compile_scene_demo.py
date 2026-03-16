@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from simworld.compiler import compile_scene, draft_scene_ir_from_text
+from agentworld.compiler import compile_scene, draft_scene_ir_from_text
 
 
 if __name__ == "__main__":

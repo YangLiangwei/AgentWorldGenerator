@@ -6,9 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from simworld.agent import RuleAgent
-from simworld.compiler import compile_scene
-from simworld.runtime import SimulationRuntime
+from agentworld.agents import RuleAgent
+from agentworld.compiler import compile_scene
+from agentworld.core import SimulationRuntime
 
 
 if __name__ == "__main__":

@@ -1,50 +1,39 @@
-# SimWorld MVP
+# AgentWorldGenerator
 
-Automatic Agent Simulation World Generator (MVP scaffold).
+Agent-native simulation world engine + generator (MVP).
 
-## Architecture (elegant, minimal)
+## Architecture
 
-1. **World Definition Layer** (`simworld/spec.py`)
-   - Declarative world spec: entities/agents, actions, initial state, metrics.
-2. **Simulation Runtime Layer** (`simworld/runtime.py`)
-   - Deterministic `validate -> resolve -> log` tick execution.
-3. **Agent Layer** (`simworld/agent.py`)
-   - Unified `observe -> decide -> act` contract and baseline `RuleAgent`.
-4. **Analytics/Event Layer** (`simworld/events.py`)
-   - Append-only event log for replay and auditing.
+- `agentworld/core`: deterministic runtime (`observe/object/interaction/outcome`)
+- `agentworld/schema`: declarative world schema + spec loading
+- `agentworld/compiler`: scene pipeline (`text -> scene IR -> world spec`)
+- `agentworld/validators`: static checks for generated worlds
+- `agentworld/cli`: command-line entry (`awg`)
 
-### Generation Pipeline
+## Atomic World Contract
 
-`scenario text/dict -> Scene IR -> compiler -> WorldSpec -> Runtime`
-
-Current MVP supports two compile paths in `simworld/compiler.py`:
-- v0.1 runtime dict (`initial_state` + `actions`)
-- v0.2 World DSL (`world` + `entities` + `resource_nodes`)
-
-It also includes a deterministic text->Scene IR draft helper (`draft_scene_ir_from_text`) for rapid prototyping.
+Every generated world follows four atoms:
+- **Observe**: read local state
+- **Object**: everything is an object with state
+- **Interaction**: only legal interactions can be submitted
+- **Outcome**: state transitions are resolved by engine rules (not self-reported)
 
 ## Quickstart
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
 python examples/run_minimal.py
+python examples/compile_scene_demo.py
 python -m unittest discover -s tests -q
 ```
 
-## Atomic World Model (core contract)
+## CLI (MVP)
 
-SimWorld is being aligned to your four atomic primitives:
-- **Observe**: `runtime.observe(agent_id)`
-- **Object**: `runtime.get_object(object_id)`
-- **Interaction**: `events.Interaction`
-- **Outcome**: `events.Outcome` produced by runtime resolution
+```bash
+python -m agentworld.cli.main generate "a university world with labs and students" --out world.generated.json
+python -m agentworld.cli.main validate world.generated.json
+```
 
-Rule: outcomes are resolved by the engine, never self-reported by agents.
+## Notes
 
-## Why this structure
-
-- Deterministic core for reproducibility.
-- LLM-friendly edges (compiler/agent), not state authority.
-- Event sourcing for replay, A/B diff, and explainability.
+- `simworld/*` modules are kept as compatibility shims.
+- Current text generation is deterministic heuristic draft; richer NL compilation is next.
