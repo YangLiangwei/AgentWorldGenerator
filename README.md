@@ -32,6 +32,7 @@ python -m unittest discover -s tests -q
 python -m agentworld.cli.main generate "a university world with labs and students" --out world.generated.json
 python -m agentworld.cli.main validate world.generated.json
 python -m agentworld.cli.main run world.generated.json --ticks 30 --log run.jsonl
+python -m agentworld.cli.main render world.generated.json --agent agent_professor_1 --ticks 10 --out render_spec.json --prompt-out image_prompt.txt
 ```
 
 Current generator has deterministic IR presets for broad scene families:

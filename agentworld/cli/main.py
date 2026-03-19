@@ -7,6 +7,7 @@ from pathlib import Path
 from ..agents import RuleAgent
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
+from ..rendering import build_image_prompt, build_render_spec
 from ..validators import validate_world_report
 
 
@@ -78,6 +79,51 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_render(args: argparse.Namespace) -> int:
+    data = json.loads(Path(args.world).read_text())
+    report = validate_world_report(data)
+    if not report.ok:
+        for issue in report.issues:
+            print(f"[{issue.level}] {issue.message}")
+        print("render aborted: invalid world")
+        return 1
+
+    spec = compile_scene(data)
+    runtime = SimulationRuntime(spec)
+
+    # Optional warmup so render reflects evolved state.
+    warmup = max(0, min(args.ticks, spec.max_ticks))
+    if warmup > 0:
+        agents = {aid: RuleAgent(aid) for aid in runtime.state.agents.keys()}
+        for _ in range(warmup):
+            decisions = {}
+            for aid, agent in agents.items():
+                agent.observe(runtime.observe(aid))
+                d = agent.decide()
+                decisions[aid] = {"action": d.action, "params": d.params}
+            runtime.run_tick(decisions)
+
+    if args.agent not in runtime.state.agents:
+        print(f"render aborted: unknown agent '{args.agent}'")
+        return 1
+
+    obs = runtime.observe(args.agent)
+    render_spec = build_render_spec(obs, agent_id=args.agent, radius=args.radius)
+    prompt = build_image_prompt(render_spec)
+
+    if args.out:
+        Path(args.out).write_text(json.dumps(render_spec, ensure_ascii=False, indent=2))
+        print(f"render_spec: {args.out}")
+
+    if args.prompt_out:
+        Path(args.prompt_out).write_text(prompt)
+        print(f"prompt: {args.prompt_out}")
+    else:
+        print(prompt)
+
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="awg", description="AgentWorldGenerator CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -96,6 +142,15 @@ def main() -> int:
     p_run.add_argument("--ticks", type=int, default=20)
     p_run.add_argument("--log", default="")
     p_run.set_defaults(func=cmd_run)
+
+    p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
+    p_render.add_argument("world")
+    p_render.add_argument("--agent", required=True)
+    p_render.add_argument("--radius", type=int, default=1)
+    p_render.add_argument("--ticks", type=int, default=0, help="optional warmup ticks before render")
+    p_render.add_argument("--out", default="")
+    p_render.add_argument("--prompt-out", default="")
+    p_render.set_defaults(func=cmd_render)
 
     args = parser.parse_args()
     return args.func(args)
