@@ -4,6 +4,7 @@ from pathlib import Path
 
 from agentworld.compiler import compile_scene
 from agentworld.core.runtime import SimulationRuntime, ValidationError
+from agentworld.schema import ActionSpec
 
 
 def _load_spec():
@@ -51,6 +52,30 @@ class RuntimeTests(unittest.TestCase):
         outcome = runtime.step_action("a1", "gather", {"resource": "food"})
         self.assertIn("ok:", outcome.result)
         self.assertIn("energy", outcome.state_delta)
+
+    def test_custom_action_handler(self):
+        spec = _load_spec()
+        spec.actions["ping"] = ActionSpec(name="ping", cost=0, params=[])
+        runtime = SimulationRuntime(spec)
+
+        def _ping(agent, params):
+            agent.traits["pinged"] = True
+            return "ok:ping", {"traits": {"pinged": True}}
+
+        runtime.register_action_handler("ping", _ping)
+        out = runtime.step_action("a1", "ping", {})
+        self.assertEqual(out.result, "ok:ping")
+        self.assertTrue(runtime.state.agents["a1"].traits["pinged"])
+
+    def test_role_constraint(self):
+        spec = _load_spec()
+        spec.actions["treat"] = ActionSpec(name="treat", cost=0, params=[])
+        spec.constraints = [{"kind": "requires_role", "action": "treat", "roles": ["doctor"]}]
+        spec.initial_state.agents["a1"].traits["role"] = "student"
+        runtime = SimulationRuntime(spec)
+
+        with self.assertRaises(ValidationError):
+            runtime.step_action("a1", "treat", {})
 
 
 if __name__ == "__main__":

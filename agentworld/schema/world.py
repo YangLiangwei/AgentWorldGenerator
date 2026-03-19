@@ -34,6 +34,8 @@ class WorldSpec:
     actions: Dict[str, ActionSpec]
     initial_state: WorldState
     metrics: List[str] = field(default_factory=lambda: ["survival", "wealth"])
+    rules: Dict[str, Any] = field(default_factory=dict)
+    constraints: List[Dict[str, Any]] = field(default_factory=list)
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "WorldSpec":
@@ -65,4 +67,6 @@ class WorldSpec:
             actions=actions,
             initial_state=state,
             metrics=data.get("metrics", ["survival", "wealth"]),
+            rules=dict(data.get("rules", {})),
+            constraints=list(data.get("constraints", [])),
         )

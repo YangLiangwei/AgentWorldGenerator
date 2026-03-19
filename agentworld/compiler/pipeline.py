@@ -61,6 +61,8 @@ def _compile_from_world_dsl(scene: Dict[str, Any]) -> Dict[str, Any]:
             "agents": agents,
         },
         "metrics": metrics,
+        "rules": dict(rules),
+        "constraints": list(scene.get("constraints", [])),
     }
 
 
@@ -106,7 +108,10 @@ def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
         ir["rules"]["queueing"] = True
         ir["rules"]["access_control"] = True
         ir["flows"] = ["checkin", "pay", "triage", "treat"]
-        ir["constraints"] = ["patients must checkin before treat", "triage required for department access"]
+        ir["constraints"] = [
+            {"kind": "requires_role", "action": "treat", "roles": ["doctor"]},
+            {"kind": "requires_role", "action": "pay", "roles": ["cashier", "participant"]},
+        ]
         return ir
 
     if any(k in text for k in ["university", "大学", "lab", "课题组"]):
@@ -116,7 +121,9 @@ def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
             roles=["professor", "student", "student", "researcher", "manager"],
         )
         ir["flows"] = ["enroll", "attend", "research"]
-        ir["constraints"] = ["lab access requires enrollment", "research needs advisor relation"]
+        ir["constraints"] = [
+            {"kind": "requires_role", "action": "research", "roles": ["researcher", "professor", "student"]}
+        ]
         return ir
 
     if any(k in text for k in ["service", "餐厅", "cafe", "restaurant"]):

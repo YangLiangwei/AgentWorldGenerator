@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Dict, Any
+from typing import Any, Callable, Dict, Tuple
 
 from .events import Event, EventLog, Interaction, Outcome
-from ..schema.world import WorldSpec, WorldState
+from ..schema.world import AgentState, WorldSpec, WorldState
 
 
 class ValidationError(ValueError):
     pass
+
+
+ActionHandler = Callable[[AgentState, Dict[str, Any]], Tuple[str, Dict[str, Any]]]
 
 
 class SimulationRuntime:
@@ -16,6 +19,15 @@ class SimulationRuntime:
         self.spec = spec
         self.state: WorldState = deepcopy(spec.initial_state)
         self.log = EventLog()
+        self._handlers: Dict[str, ActionHandler] = {}
+        self._register_default_handlers()
+
+    def register_action_handler(self, action: str, handler: ActionHandler) -> None:
+        self._handlers[action] = handler
+
+    def _register_default_handlers(self) -> None:
+        self.register_action_handler("gather", self._handle_gather)
+        self.register_action_handler("rest", self._handle_rest)
 
     def observe(self, agent_id: str) -> Dict[str, Any]:
         agent = self.state.agents[agent_id]
@@ -39,8 +51,23 @@ class SimulationRuntime:
                 "traits": dict(a.traits),
             }
         if object_id in self.state.resources:
-            return {"id": object_id, "kind": "resource_node", "resources": dict(self.state.resources[object_id])}
+            return {
+                "id": object_id,
+                "kind": "resource_node",
+                "resources": dict(self.state.resources[object_id]),
+            }
         raise ValidationError(f"unknown object: {object_id}")
+
+    def _check_constraints(self, actor_id: str, action: str) -> None:
+        actor = self.state.agents[actor_id]
+        for c in self.spec.constraints:
+            if c.get("action") != action:
+                continue
+            kind = c.get("kind")
+            if kind == "requires_role":
+                allowed = set(c.get("roles", []))
+                if actor.traits.get("role") not in allowed:
+                    raise ValidationError(f"constraint failed: action '{action}' requires role in {sorted(allowed)}")
 
     def validate_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
         if action not in self.spec.actions:
@@ -53,10 +80,26 @@ class SimulationRuntime:
                 raise ValidationError(f"missing action param: {required}")
         if self.state.agents[actor_id].energy < spec_action.cost:
             raise ValidationError("not enough energy")
+        self._check_constraints(actor_id, action)
 
     def step_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> Outcome:
         interaction = Interaction(actor_id=actor_id, action=action, params=params)
         return self.apply_interaction(interaction)
+
+    def _handle_gather(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        resource = params["resource"]
+        available = self.state.resources.get(agent.location, {}).get(resource, 0)
+        if available <= 0:
+            return "fail:no_resource", {}
+
+        self.state.resources[agent.location][resource] -= 1
+        agent.inventory[resource] = agent.inventory.get(resource, 0) + 1
+        return "ok:gather", {"inventory": {resource: 1}, "resource_node": {agent.location: {resource: -1}}}
+
+    def _handle_rest(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        prev = agent.energy
+        agent.energy = min(agent.energy + 1, 10)
+        return "ok:rest", {"restored": agent.energy - prev}
 
     def apply_interaction(self, interaction: Interaction) -> Outcome:
         self.validate_action(interaction.actor_id, interaction.action, interaction.params)
@@ -66,24 +109,12 @@ class SimulationRuntime:
         agent.energy -= cost
         delta: Dict[str, Any] = {"energy": agent.energy - before_energy}
 
-        if interaction.action == "gather":
-            resource = interaction.params["resource"]
-            available = self.state.resources.get(agent.location, {}).get(resource, 0)
-            if available > 0:
-                self.state.resources[agent.location][resource] -= 1
-                agent.inventory[resource] = agent.inventory.get(resource, 0) + 1
-                result = "ok:gather"
-                delta.update({"inventory": {resource: 1}, "resource_node": {agent.location: {resource: -1}}})
-            else:
-                result = "fail:no_resource"
-        elif interaction.action == "rest":
-            prev = agent.energy
-            agent.energy = min(agent.energy + 1, 10)
-            result = "ok:rest"
-            delta["energy"] = agent.energy - before_energy
-            delta["restored"] = agent.energy - prev
+        handler = self._handlers.get(interaction.action)
+        if handler is None:
+            result, action_delta = "ok:noop", {}
         else:
-            result = "ok:noop"
+            result, action_delta = handler(agent, interaction.params)
+        delta.update(action_delta)
 
         self.log.append(
             Event(
