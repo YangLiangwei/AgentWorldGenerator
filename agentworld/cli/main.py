@@ -7,7 +7,7 @@ from pathlib import Path
 from ..agents import RuleAgent
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
-from ..rendering import build_image_prompt, build_render_spec
+from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
 from ..validators import validate_world_report
 
 
@@ -109,11 +109,23 @@ def cmd_render(args: argparse.Namespace) -> int:
 
     obs = runtime.observe(args.agent)
     render_spec = build_render_spec(obs, agent_id=args.agent, radius=args.radius)
-    prompt = build_image_prompt(render_spec)
+    render_context = build_render_context(
+        obs,
+        agent_id=args.agent,
+        radius=args.radius,
+        camera_profile=args.camera_profile,
+        style_profile=args.style_profile,
+        world_name=spec.name,
+    )
+    prompt = build_image_prompt_from_context(render_context)
 
     if args.out:
         Path(args.out).write_text(json.dumps(render_spec, ensure_ascii=False, indent=2))
         print(f"render_spec: {args.out}")
+
+    if args.context_out:
+        Path(args.context_out).write_text(json.dumps(render_context, ensure_ascii=False, indent=2))
+        print(f"render_context: {args.context_out}")
 
     if args.prompt_out:
         Path(args.prompt_out).write_text(prompt)
@@ -147,8 +159,11 @@ def main() -> int:
     p_render.add_argument("world")
     p_render.add_argument("--agent", required=True)
     p_render.add_argument("--radius", type=int, default=1)
+    p_render.add_argument("--camera-profile", default="topdown", choices=["topdown", "first_person", "cinematic"])
+    p_render.add_argument("--style-profile", default="sim-minimal-v1")
     p_render.add_argument("--ticks", type=int, default=0, help="optional warmup ticks before render")
     p_render.add_argument("--out", default="")
+    p_render.add_argument("--context-out", default="")
     p_render.add_argument("--prompt-out", default="")
     p_render.set_defaults(func=cmd_render)
 
