@@ -8,6 +8,10 @@ from ..schema.world import WorldSpec
 DEFAULT_ACTIONS = {
     "gather": {"cost": 1, "params": ["resource"]},
     "rest": {"cost": 0, "params": []},
+    "move": {"cost": 1, "params": ["location"]},
+    "transfer": {"cost": 1, "params": ["target_id", "resource", "amount"]},
+    "enqueue": {"cost": 0, "params": ["queue_id"]},
+    "service": {"cost": 0, "params": ["queue_id"]},
 }
 
 ROLE_LIBRARY: Dict[str, Dict[str, Any]] = {

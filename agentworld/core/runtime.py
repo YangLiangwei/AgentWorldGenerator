@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Tuple
 
 from .events import Event, EventLog, Interaction, Outcome
+from ..rules import AccessRule, QueueRule, TransferRule
 from ..schema.world import AgentState, WorldSpec, WorldState
 
 
@@ -20,7 +21,9 @@ class SimulationRuntime:
         self.state: WorldState = deepcopy(spec.initial_state)
         self.log = EventLog()
         self._handlers: Dict[str, ActionHandler] = {}
+        self._rules = []
         self._register_default_handlers()
+        self._register_default_rules()
 
     def register_action_handler(self, action: str, handler: ActionHandler) -> None:
         self._handlers[action] = handler
@@ -28,6 +31,20 @@ class SimulationRuntime:
     def _register_default_handlers(self) -> None:
         self.register_action_handler("gather", self._handle_gather)
         self.register_action_handler("rest", self._handle_rest)
+        self.register_action_handler("move", self._handle_move)
+        self.register_action_handler("transfer", self._handle_transfer)
+        self.register_action_handler("enqueue", self._handle_enqueue)
+        self.register_action_handler("service", self._handle_service)
+
+    def _register_default_rules(self) -> None:
+        queue_cfg = self.spec.rules.get("queue", {}) if isinstance(self.spec.rules, dict) else {}
+        access_cfg = self.spec.rules.get("access", {}) if isinstance(self.spec.rules, dict) else {}
+        transfer_enabled = bool(self.spec.rules.get("transfer", True)) if isinstance(self.spec.rules, dict) else True
+
+        self._rules.append(QueueRule(queue_map=queue_cfg.get("queues", {})))
+        self._rules.append(AccessRule(policies=access_cfg.get("policies", {})))
+        if transfer_enabled:
+            self._rules.append(TransferRule())
 
     def observe(self, agent_id: str) -> Dict[str, Any]:
         agent = self.state.agents[agent_id]
@@ -81,6 +98,11 @@ class SimulationRuntime:
         if self.state.agents[actor_id].energy < spec_action.cost:
             raise ValidationError("not enough energy")
         self._check_constraints(actor_id, action)
+        for rule in self._rules:
+            try:
+                rule.validate(self, actor_id, action, params)
+            except ValueError as e:
+                raise ValidationError(str(e)) from e
 
     def step_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> Outcome:
         interaction = Interaction(actor_id=actor_id, action=action, params=params)
@@ -101,6 +123,28 @@ class SimulationRuntime:
         agent.energy = min(agent.energy + 1, 10)
         return "ok:rest", {"restored": agent.energy - prev}
 
+    def _handle_move(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        new_location = str(params["location"])
+        if new_location not in self.state.resources:
+            return "fail:unknown_location", {}
+        old = agent.location
+        agent.location = new_location
+        return "ok:move", {"location": {"from": old, "to": new_location}}
+
+    def _handle_transfer(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        resource = str(params["resource"])
+        amount = int(params["amount"])
+        target = self.state.agents[str(params["target_id"])]
+        agent.inventory[resource] = agent.inventory.get(resource, 0) - amount
+        target.inventory[resource] = target.inventory.get(resource, 0) + amount
+        return "ok:transfer", {"transfer": {"resource": resource, "amount": amount, "to": target.id}}
+
+    def _handle_enqueue(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        return "ok:enqueue", {"queue": {"queue_id": params.get("queue_id", "default"), "action": "enqueue"}}
+
+    def _handle_service(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        return "ok:service", {"queue": {"queue_id": params.get("queue_id", "default"), "action": "service"}}
+
     def apply_interaction(self, interaction: Interaction) -> Outcome:
         self.validate_action(interaction.actor_id, interaction.action, interaction.params)
         agent = self.state.agents[interaction.actor_id]
@@ -115,6 +159,9 @@ class SimulationRuntime:
         else:
             result, action_delta = handler(agent, interaction.params)
         delta.update(action_delta)
+
+        for rule in self._rules:
+            rule.after_action(self, interaction.actor_id, interaction.action, interaction.params, result)
 
         self.log.append(
             Event(
