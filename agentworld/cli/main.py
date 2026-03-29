@@ -8,6 +8,7 @@ from ..agents import RuleAgent, build_profiles_from_world, load_profiles
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
 from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
+from ..replay import build_replay_html, snapshot_state, write_run_artifacts
 from ..validators import validate_world_report
 
 
@@ -65,6 +66,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     agents = {aid: RuleAgent(aid, profile=profiles.get(aid)) for aid in runtime.state.agents.keys()}
 
     ticks = min(args.ticks, spec.max_ticks)
+    snapshots = []
+    render_contexts = []
+    prompts = []
+
     for _ in range(ticks):
         decisions = {}
         for aid, agent in agents.items():
@@ -73,11 +78,65 @@ def cmd_run(args: argparse.Namespace) -> int:
             decisions[aid] = {"action": d.action, "params": d.params}
         runtime.run_tick(decisions)
 
+        snapshots.append(snapshot_state(runtime))
+
+        # Keep one canonical viewpoint for replay debugging
+        focus_agent = sorted(runtime.state.agents.keys())[0]
+        obs = runtime.observe(focus_agent)
+        profile = profiles.get(focus_agent)
+        ctx = build_render_context(
+            obs,
+            agent_id=focus_agent,
+            radius=1,
+            camera_profile="topdown",
+            style_profile="sim-minimal-v1",
+            world_name=spec.name,
+            agent_profile=(
+                {
+                    "role": profile.role,
+                    "persona": profile.persona,
+                    "strategy": profile.strategy,
+                    "visual_anchor": profile.visual_anchor,
+                }
+                if profile
+                else None
+            ),
+        )
+        render_contexts.append(ctx)
+        prompts.append({"tick": runtime.state.tick, "agent_id": focus_agent, "prompt": build_image_prompt_from_context(ctx)})
+
     print(f"run: ticks={runtime.state.tick} agents={len(runtime.state.agents)} events={len(runtime.log.all())}")
 
     if args.log:
         Path(args.log).write_text(runtime.log.to_jsonl())
         print(f"log: {args.log}")
+
+    if args.artifact_dir:
+        events = [
+            {
+                "tick": e.tick,
+                "actor_id": e.actor_id,
+                "action": e.action,
+                "payload": e.payload,
+                "result": e.result,
+            }
+            for e in runtime.log.all()
+        ]
+        paths = write_run_artifacts(
+            args.artifact_dir,
+            events=events,
+            snapshots=snapshots,
+            render_contexts=render_contexts,
+            prompts=prompts,
+        )
+        print(f"artifacts: {paths}")
+
+    return 0
+
+
+def cmd_replay(args: argparse.Namespace) -> int:
+    out = build_replay_html(args.artifact_dir, args.out)
+    print(f"replay_html: {out}")
     return 0
 
 
@@ -167,8 +226,14 @@ def main() -> int:
     p_run.add_argument("world")
     p_run.add_argument("--ticks", type=int, default=20)
     p_run.add_argument("--log", default="")
+    p_run.add_argument("--artifact-dir", default="", help="optional directory for replay/debug artifacts")
     p_run.add_argument("--profiles", default="", help="optional JSON file mapping agent_id -> AgentProfile")
     p_run.set_defaults(func=cmd_run)
+
+    p_replay = sub.add_parser("replay", help="Build minimal HTML replay from run artifacts")
+    p_replay.add_argument("artifact_dir")
+    p_replay.add_argument("--out", default="replay.html")
+    p_replay.set_defaults(func=cmd_replay)
 
     p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
     p_render.add_argument("world")
