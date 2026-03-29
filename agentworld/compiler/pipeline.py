@@ -72,13 +72,21 @@ def _build_ir(world_name: str, zones: List[str], roles: List[str]) -> Dict[str, 
 
     for idx, role in enumerate(roles, start=1):
         tpl = ROLE_LIBRARY.get(role, ROLE_LIBRARY["participant"])
+        traits = dict(tpl["traits"])
+        traits["profile"] = {
+            "role": role,
+            "persona": "pragmatic" if role in {"participant", "student"} else "specialist",
+            "strategy": "balanced",
+            "visual_anchor": f"{role}-anchor",
+            "allowed_actions": ["gather", "rest"],
+        }
         entities.append(
             {
                 "id": f"agent_{role}_{idx}",
                 "type": "agent",
                 "location": zones[min(idx - 1, len(zones) - 1)],
                 "energy": tpl["energy"],
-                "traits": dict(tpl["traits"]),
+                "traits": traits,
             }
         )
 

@@ -54,6 +54,7 @@ def build_image_prompt_from_context(render_context: Dict[str, Any]) -> str:
     local_resources = render_context.get("local_resources", {})
     continuity = render_context.get("continuity_tokens", {})
     style_profile = render_context.get("style_profile", "sim-minimal-v1")
+    profile = render_context.get("agent_profile", {})
     events = render_context.get("recent_events", [])
 
     focus_entity = entities[0] if entities else {"id": camera.get("focus_agent", "unknown"), "energy": 0, "inventory": {}}
@@ -62,6 +63,8 @@ def build_image_prompt_from_context(render_context: Dict[str, Any]) -> str:
         "Render a deterministic simulation frame. "
         f"World '{summary['world']}', tick {summary['tick']}, camera profile {camera['profile']} at location '{camera['location']}'. "
         f"Focus agent {focus_entity['id']} energy {focus_entity.get('energy', 0)} inventory {focus_entity.get('inventory', {})}. "
+        f"Agent profile: role={profile.get('role', 'unknown')}, persona={profile.get('persona', 'n/a')}, "
+        f"strategy={profile.get('strategy', 'n/a')}, visual_anchor={profile.get('visual_anchor', 'n/a')}. "
         f"Local resources: {local_resources}. "
         f"Recent events: {events}. "
         f"Style profile: {style_profile}. "

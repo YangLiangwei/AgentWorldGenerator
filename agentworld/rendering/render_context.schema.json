@@ -64,6 +64,16 @@
       "items": { "type": "object" }
     },
     "style_profile": { "type": "string", "minLength": 1 },
+    "agent_profile": {
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "persona": { "type": "string" },
+        "strategy": { "type": "string" },
+        "visual_anchor": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "continuity_tokens": {
       "type": "object",
       "required": ["scene_token", "agent_anchor", "style_anchor"],

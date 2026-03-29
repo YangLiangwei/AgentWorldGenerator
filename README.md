@@ -44,6 +44,11 @@ Current generator has deterministic IR presets for broad scene families:
 - service / restaurant
 - generic fallback
 
+AgentProfile v1 (current):
+- compiler emits default `traits.profile` for generated agents
+- `run` supports `--profiles <json>` override file
+- `render` reads profile and injects identity anchors into RenderContext/prompt
+
 ## Notes
 
 - `simworld/*` modules are kept as compatibility shims.

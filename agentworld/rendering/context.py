@@ -25,6 +25,7 @@ def build_render_context(
     style_profile: str = "sim-minimal-v1",
     recent_events: Optional[List[Dict[str, Any]]] = None,
     world_name: str = "generated-world",
+    agent_profile: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build a stable render context that can be consumed by image-generation prompts.
 
@@ -63,9 +64,11 @@ def build_render_context(
 
     normalized_events = list(recent_events or [])
 
+    normalized_profile = dict(agent_profile or {})
+
     continuity_source = (
         f"{world_name}|{tick}|{camera_profile}|{agent_id}|{location}|"
-        f"{inventory}|{local_resources}|{normalized_events}"
+        f"{inventory}|{local_resources}|{normalized_events}|{normalized_profile}"
     )
     continuity_tokens = {
         "scene_token": _stable_hash(continuity_source),
@@ -81,5 +84,6 @@ def build_render_context(
         "local_resources": local_resources,
         "recent_events": normalized_events,
         "style_profile": style_profile,
+        "agent_profile": normalized_profile,
         "continuity_tokens": continuity_tokens,
     }

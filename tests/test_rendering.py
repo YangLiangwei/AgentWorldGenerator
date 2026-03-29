@@ -47,11 +47,19 @@ class RenderingTests(unittest.TestCase):
             "inventory": {"ticket": 1},
             "resources": {"triage": {"food": 3}},
         }
-        ctx = build_render_context(obs, agent_id="agent_doctor_1", camera_profile="first_person", world_name="hospital-world")
+        ctx = build_render_context(
+            obs,
+            agent_id="agent_doctor_1",
+            camera_profile="first_person",
+            world_name="hospital-world",
+            agent_profile={"role": "doctor", "persona": "careful", "strategy": "service-first", "visual_anchor": "white-coat"},
+        )
+        self.assertEqual(ctx["agent_profile"]["role"], "doctor")
         prompt = build_image_prompt_from_context(ctx)
         self.assertIn("hospital-world", prompt)
         self.assertIn("first_person", prompt)
         self.assertIn("agent_doctor_1", prompt)
+        self.assertIn("white-coat", prompt)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ class CompilerTests(unittest.TestCase):
     def test_draft_scene_ir_from_text_university(self):
         ir = draft_scene_ir_from_text("a university world with labs and students")
         self.assertEqual(ir["world"]["name"], "university-world")
+        first_traits = ir["entities"][0].get("traits", {})
+        self.assertIn("profile", first_traits)
         spec = compile_scene(ir)
         self.assertGreaterEqual(len(spec.initial_state.agents), 4)
 

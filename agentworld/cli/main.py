@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ..agents import RuleAgent
+from ..agents import RuleAgent, build_profiles_from_world, load_profiles
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
 from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
@@ -60,7 +60,9 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     spec = compile_scene(data)
     runtime = SimulationRuntime(spec)
-    agents = {aid: RuleAgent(aid) for aid in runtime.state.agents.keys()}
+
+    profiles = load_profiles(args.profiles) if args.profiles else build_profiles_from_world(data)
+    agents = {aid: RuleAgent(aid, profile=profiles.get(aid)) for aid in runtime.state.agents.keys()}
 
     ticks = min(args.ticks, spec.max_ticks)
     for _ in range(ticks):
@@ -90,11 +92,12 @@ def cmd_render(args: argparse.Namespace) -> int:
 
     spec = compile_scene(data)
     runtime = SimulationRuntime(spec)
+    profiles = load_profiles(args.profiles) if args.profiles else build_profiles_from_world(data)
 
     # Optional warmup so render reflects evolved state.
     warmup = max(0, min(args.ticks, spec.max_ticks))
     if warmup > 0:
-        agents = {aid: RuleAgent(aid) for aid in runtime.state.agents.keys()}
+        agents = {aid: RuleAgent(aid, profile=profiles.get(aid)) for aid in runtime.state.agents.keys()}
         for _ in range(warmup):
             decisions = {}
             for aid, agent in agents.items():
@@ -109,6 +112,7 @@ def cmd_render(args: argparse.Namespace) -> int:
 
     obs = runtime.observe(args.agent)
     render_spec = build_render_spec(obs, agent_id=args.agent, radius=args.radius)
+    profile = profiles.get(args.agent)
     render_context = build_render_context(
         obs,
         agent_id=args.agent,
@@ -116,6 +120,16 @@ def cmd_render(args: argparse.Namespace) -> int:
         camera_profile=args.camera_profile,
         style_profile=args.style_profile,
         world_name=spec.name,
+        agent_profile=(
+            {
+                "role": profile.role,
+                "persona": profile.persona,
+                "strategy": profile.strategy,
+                "visual_anchor": profile.visual_anchor,
+            }
+            if profile
+            else None
+        ),
     )
     prompt = build_image_prompt_from_context(render_context)
 
@@ -153,6 +167,7 @@ def main() -> int:
     p_run.add_argument("world")
     p_run.add_argument("--ticks", type=int, default=20)
     p_run.add_argument("--log", default="")
+    p_run.add_argument("--profiles", default="", help="optional JSON file mapping agent_id -> AgentProfile")
     p_run.set_defaults(func=cmd_run)
 
     p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
@@ -162,6 +177,7 @@ def main() -> int:
     p_render.add_argument("--camera-profile", default="topdown", choices=["topdown", "first_person", "cinematic"])
     p_render.add_argument("--style-profile", default="sim-minimal-v1")
     p_render.add_argument("--ticks", type=int, default=0, help="optional warmup ticks before render")
+    p_render.add_argument("--profiles", default="", help="optional JSON file mapping agent_id -> AgentProfile")
     p_render.add_argument("--out", default="")
     p_render.add_argument("--context-out", default="")
     p_render.add_argument("--prompt-out", default="")
