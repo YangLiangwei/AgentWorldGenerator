@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentworld.local/schemas/render_context.v0.2.json",
+  "title": "RenderContext v0.2",
+  "type": "object",
+  "required": [
+    "version",
+    "world_state_summary",
+    "camera_view",
+    "entities_visible",
+    "local_resources",
+    "recent_events",
+    "style_profile",
+    "continuity_tokens"
+  ],
+  "properties": {
+    "version": { "const": "render-context.v0.2" },
+    "world_state_summary": {
+      "type": "object",
+      "required": ["world", "tick", "visible_location", "resource_nodes"],
+      "properties": {
+        "world": { "type": "string", "minLength": 1 },
+        "tick": { "type": "integer", "minimum": 0 },
+        "visible_location": { "type": "string" },
+        "resource_nodes": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "camera_view": {
+      "type": "object",
+      "required": ["profile", "focus_agent", "radius", "location"],
+      "properties": {
+        "profile": { "enum": ["topdown", "first_person", "cinematic"] },
+        "focus_agent": { "type": "string", "minLength": 1 },
+        "radius": { "type": "integer", "minimum": 1 },
+        "location": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "entities_visible": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "location", "energy", "inventory"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "const": "agent" },
+          "location": { "type": "string" },
+          "energy": { "type": "integer" },
+          "inventory": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "local_resources": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" }
+    },
+    "recent_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tick", "actor_id", "action", "result", "tags"],
+        "properties": {
+          "tick": { "type": "integer", "minimum": 0 },
+          "actor_id": { "type": "string" },
+          "action": { "type": "string" },
+          "result": { "type": "string" },
+          "target_id": { "type": ["string", "null"] },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "style_profile": { "type": "string", "minLength": 1 },
+    "agent_profile": {
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "persona": { "type": "string" },
+        "strategy": { "type": "string" },
+        "visual_anchor": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "continuity_tokens": {
+      "type": "object",
+      "required": ["identity_token", "scene_token", "history_token", "style_token"],
+      "properties": {
+        "identity_token": { "type": "string", "minLength": 8 },
+        "scene_token": { "type": "string", "minLength": 8 },
+        "history_token": { "type": "string", "minLength": 8 },
+        "style_token": { "type": "string", "minLength": 8 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

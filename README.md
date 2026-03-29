@@ -35,8 +35,8 @@ python -m agentworld.cli.main run world.generated.json --ticks 30 --log run.json
 python -m agentworld.cli.main render world.generated.json --agent agent_professor_1 --ticks 10 --out render_spec.json --context-out render_context.json --prompt-out image_prompt.txt
 ```
 
-`render_context.json` follows **RenderContext v0.1** (`agentworld/rendering/render_context.schema.json`),
-which is the protocol boundary between deterministic world state and generative visual rendering.
+`render_context.json` now follows **RenderContext v0.2** (`agentworld/rendering/render_context_v0_2.schema.json`),
+with backward-compatible upgrade support for v0.1 payloads.
 
 Current generator has deterministic IR presets for broad scene families:
 - hospital / clinic

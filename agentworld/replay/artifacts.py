@@ -70,7 +70,11 @@ def build_replay_html(artifact_dir: str, out_html: str) -> str:
 <input id='tick' type='range' min='0' max='0' value='0' style='width:100%'/><div id='tlabel'></div>
 <div class='row'>
 <div class='col'><h3>State</h3><pre id='state'></pre></div>
+<div class='col'><h3>State Diff (vs previous)</h3><pre id='state_diff'></pre></div>
+</div>
+<div class='row'>
 <div class='col'><h3>Events@Tick</h3><pre id='events'></pre></div>
+<div class='col'><h3>Rule Violations@Tick</h3><pre id='violations'></pre></div>
 </div>
 <div class='row'>
 <div class='col'><h3>Render Context</h3><pre id='ctx'></pre></div>
@@ -83,12 +87,25 @@ const ctxRaw = `{contexts}`.trim().split(/\n+/).filter(Boolean).map(x=>JSON.pars
 const promptRaw = `{prompts}`.trim().split(/\n+/).filter(Boolean).map(x=>JSON.parse(x));
 const slider = document.getElementById('tick');
 slider.max = Math.max(0, statesRaw.length-1);
+
+function shallowDiff(prev, curr) {{
+  const p = JSON.stringify(prev || {{}});
+  const c = JSON.stringify(curr || {{}});
+  if (p === c) return {{ unchanged: true }};
+  return {{ unchanged: false, previous: prev || {{}}, current: curr || {{}} }};
+}}
+
 function draw(i){{
   const st = statesRaw[i] || {{}};
+  const prev = i > 0 ? statesRaw[i-1] : {{}};
   const tk = st.tick ?? i;
+  const tickEvents = eventsRaw.filter(e=>e.tick===tk);
+  const violations = tickEvents.filter(e=>(e.result||'').startsWith('fail:') || ((e.tags||[]).includes('violation')));
   document.getElementById('tlabel').textContent = `tick = ${{tk}}`;
   document.getElementById('state').textContent = JSON.stringify(st, null, 2);
-  document.getElementById('events').textContent = JSON.stringify(eventsRaw.filter(e=>e.tick===tk), null, 2);
+  document.getElementById('state_diff').textContent = JSON.stringify(shallowDiff(prev, st), null, 2);
+  document.getElementById('events').textContent = JSON.stringify(tickEvents, null, 2);
+  document.getElementById('violations').textContent = JSON.stringify(violations, null, 2);
   document.getElementById('ctx').textContent = JSON.stringify(ctxRaw[i] || {{}}, null, 2);
   document.getElementById('prompt').textContent = (promptRaw[i]||{{}}).prompt || '';
 }}

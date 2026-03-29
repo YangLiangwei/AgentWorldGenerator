@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .context import build_render_context
+from .context import build_render_context, upgrade_render_context
 
 
 def build_render_spec(observation: Dict[str, Any], agent_id: str, radius: int = 1) -> Dict[str, Any]:
@@ -47,7 +47,8 @@ def build_image_prompt(render_spec: Dict[str, Any]) -> str:
 
 
 def build_image_prompt_from_context(render_context: Dict[str, Any]) -> str:
-    """Build deterministic text prompt from RenderContext v0.1."""
+    """Build deterministic text prompt from RenderContext (v0.1/v0.2)."""
+    render_context = upgrade_render_context(render_context)
     summary = render_context["world_state_summary"]
     camera = render_context["camera_view"]
     entities = render_context.get("entities_visible", [])
@@ -69,7 +70,8 @@ def build_image_prompt_from_context(render_context: Dict[str, Any]) -> str:
         f"Recent events: {events}. "
         f"Style profile: {style_profile}. "
         "Preserve identity and scene continuity with tokens "
-        f"scene={continuity.get('scene_token', '')}, agent={continuity.get('agent_anchor', '')}, style={continuity.get('style_anchor', '')}. "
+        f"scene={continuity.get('scene_token', '')}, identity={continuity.get('identity_token', '')}, "
+        f"history={continuity.get('history_token', '')}, style={continuity.get('style_token', '')}. "
         "No fantasy additions; stay faithful to world state."
     )
 
