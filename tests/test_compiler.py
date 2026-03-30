@@ -1,6 +1,6 @@
 import unittest
 
-from agentworld.compiler import compile_scene, draft_scene_ir_from_text
+from agentworld.compiler import compile_scene, draft_scene_ir_from_text, intent_to_ir, text_to_intent
 
 
 class CompilerTests(unittest.TestCase):
@@ -27,6 +27,12 @@ class CompilerTests(unittest.TestCase):
         self.assertIn("profile", first_traits)
         spec = compile_scene(ir)
         self.assertGreaterEqual(len(spec.initial_state.agents), 4)
+
+    def test_text_intent_pipeline(self):
+        intent = text_to_intent("hospital simulation")
+        self.assertEqual(intent["domain"], "hospital")
+        ir = intent_to_ir(intent)
+        self.assertEqual(ir["world"]["name"], "hospital-world")
 
 
 if __name__ == "__main__":

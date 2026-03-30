@@ -108,10 +108,21 @@ def _build_ir(world_name: str, zones: List[str], roles: List[str]) -> Dict[str, 
     }
 
 
-def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
+def text_to_intent(description: str) -> Dict[str, Any]:
     text = description.lower()
-
     if any(k in text for k in ["hospital", "医院", "clinic"]):
+        return {"domain": "hospital"}
+    if any(k in text for k in ["university", "大学", "lab", "课题组"]):
+        return {"domain": "university"}
+    if any(k in text for k in ["service", "餐厅", "cafe", "restaurant"]):
+        return {"domain": "service"}
+    return {"domain": "generic"}
+
+
+def intent_to_ir(intent: Dict[str, Any]) -> Dict[str, Any]:
+    domain = intent.get("domain", "generic")
+
+    if domain == "hospital":
         ir = _build_ir(
             world_name="hospital-world",
             zones=["frontdesk", "cashier", "triage", "department_a", "department_b"],
@@ -126,7 +137,7 @@ def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
         ]
         return ir
 
-    if any(k in text for k in ["university", "大学", "lab", "课题组"]):
+    if domain == "university":
         ir = _build_ir(
             world_name="university-world",
             zones=["admission", "lecture_hall", "lab_alpha", "lab_beta"],
@@ -138,7 +149,7 @@ def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
         ]
         return ir
 
-    if any(k in text for k in ["service", "餐厅", "cafe", "restaurant"]):
+    if domain == "service":
         ir = _build_ir(
             world_name="service-world",
             zones=["hall", "counter", "kitchen"],
@@ -150,6 +161,10 @@ def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
     ir = _build_ir(world_name="generated-world", zones=["zone_a", "zone_b"], roles=["operator", "participant"])
     ir["flows"] = ["explore", "exchange"]
     return ir
+
+
+def draft_scene_ir_from_text(description: str) -> Dict[str, Any]:
+    return intent_to_ir(text_to_intent(description))
 
 
 def compile_scene(scene: Dict[str, Any]) -> WorldSpec:

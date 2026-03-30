@@ -12,6 +12,10 @@ class ValidationError(ValueError):
     pass
 
 
+class InvariantError(ValueError):
+    pass
+
+
 ActionHandler = Callable[[AgentState, Dict[str, Any]], Tuple[str, Dict[str, Any]]]
 
 
@@ -86,7 +90,7 @@ class SimulationRuntime:
                 if actor.traits.get("role") not in allowed:
                     raise ValidationError(f"constraint failed: action '{action}' requires role in {sorted(allowed)}")
 
-    def validate_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
+    def _pre_validate(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
         if action not in self.spec.actions:
             raise ValidationError(f"unknown action: {action}")
         if actor_id not in self.state.agents:
@@ -97,12 +101,30 @@ class SimulationRuntime:
                 raise ValidationError(f"missing action param: {required}")
         if self.state.agents[actor_id].energy < spec_action.cost:
             raise ValidationError("not enough energy")
+
+    def _rule_validate(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
         self._check_constraints(actor_id, action)
         for rule in self._rules:
             try:
                 rule.validate(self, actor_id, action, params)
             except ValueError as e:
                 raise ValidationError(str(e)) from e
+
+    def _invariant_check(self) -> None:
+        for aid, a in self.state.agents.items():
+            if a.energy < 0:
+                raise InvariantError(f"invariant violated: agent {aid} has negative energy")
+            for res, amount in a.inventory.items():
+                if amount < 0:
+                    raise InvariantError(f"invariant violated: agent {aid} inventory {res} is negative")
+        for loc, pool in self.state.resources.items():
+            for res, amount in pool.items():
+                if amount < 0:
+                    raise InvariantError(f"invariant violated: resource {res} at {loc} is negative")
+
+    def validate_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
+        self._pre_validate(actor_id, action, params)
+        self._rule_validate(actor_id, action, params)
 
     def step_action(self, actor_id: str, action: str, params: Dict[str, Any]) -> Outcome:
         interaction = Interaction(actor_id=actor_id, action=action, params=params)
@@ -146,7 +168,9 @@ class SimulationRuntime:
         return "ok:service", {"queue": {"queue_id": params.get("queue_id", "default"), "action": "service"}}
 
     def apply_interaction(self, interaction: Interaction) -> Outcome:
+        # lifecycle: pre_validate -> rule_validate -> resolve -> rule_after -> emit_event -> invariant_check
         self.validate_action(interaction.actor_id, interaction.action, interaction.params)
+
         agent = self.state.agents[interaction.actor_id]
         cost = self.spec.actions[interaction.action].cost
         before_energy = agent.energy
@@ -172,6 +196,8 @@ class SimulationRuntime:
                 result=result,
             )
         )
+
+        self._invariant_check()
         return Outcome(tick=self.state.tick, interaction=interaction, result=result, state_delta=delta)
 
     def end_tick(self) -> None:

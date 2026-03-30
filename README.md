@@ -8,6 +8,7 @@ Agent-native simulation world engine + generator (MVP).
 - `agentworld/schema`: declarative world schema + spec loading
 - `agentworld/compiler`: scene pipeline (`text -> scene IR -> world spec`)
 - `agentworld/validators`: static checks for generated worlds
+- `agentworld/protocol`: protocol versions + upgrader/validator entrypoints
 - `agentworld/cli`: command-line entry (`awg`)
 - `agentworld/rules`: reusable rule middleware (queue/access/transfer)
 
