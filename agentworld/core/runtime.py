@@ -4,6 +4,17 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Tuple
 
 from .events import Event, EventLog, Interaction, Outcome
+from ..protocol.errors import (
+    ERR_NO_RESOURCE,
+    ERR_UNKNOWN_LOCATION,
+    OK_ENQUEUE,
+    OK_GATHER,
+    OK_MOVE,
+    OK_NOOP,
+    OK_REST,
+    OK_SERVICE,
+    OK_TRANSFER,
+)
 from ..rules import AccessRule, QueueRule, TransferRule, validate_rule_pack_config
 from ..schema.world import AgentState, WorldSpec, WorldState
 
@@ -141,24 +152,24 @@ class SimulationRuntime:
         resource = params["resource"]
         available = self.state.resources.get(agent.location, {}).get(resource, 0)
         if available <= 0:
-            return "fail:no_resource", {}
+            return ERR_NO_RESOURCE, {}
 
         self.state.resources[agent.location][resource] -= 1
         agent.inventory[resource] = agent.inventory.get(resource, 0) + 1
-        return "ok:gather", {"inventory": {resource: 1}, "resource_node": {agent.location: {resource: -1}}}
+        return OK_GATHER, {"inventory": {resource: 1}, "resource_node": {agent.location: {resource: -1}}}
 
     def _handle_rest(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         prev = agent.energy
         agent.energy = min(agent.energy + 1, 10)
-        return "ok:rest", {"restored": agent.energy - prev}
+        return OK_REST, {"restored": agent.energy - prev}
 
     def _handle_move(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         new_location = str(params["location"])
         if new_location not in self.state.resources:
-            return "fail:unknown_location", {}
+            return ERR_UNKNOWN_LOCATION, {}
         old = agent.location
         agent.location = new_location
-        return "ok:move", {"location": {"from": old, "to": new_location}}
+        return OK_MOVE, {"location": {"from": old, "to": new_location}}
 
     def _handle_transfer(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         resource = str(params["resource"])
@@ -166,13 +177,13 @@ class SimulationRuntime:
         target = self.state.agents[str(params["target_id"])]
         agent.inventory[resource] = agent.inventory.get(resource, 0) - amount
         target.inventory[resource] = target.inventory.get(resource, 0) + amount
-        return "ok:transfer", {"transfer": {"resource": resource, "amount": amount, "to": target.id}}
+        return OK_TRANSFER, {"transfer": {"resource": resource, "amount": amount, "to": target.id}}
 
     def _handle_enqueue(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        return "ok:enqueue", {"queue": {"queue_id": params.get("queue_id", "default"), "action": "enqueue"}}
+        return OK_ENQUEUE, {"queue": {"queue_id": params.get("queue_id", "default"), "action": "enqueue"}}
 
     def _handle_service(self, agent: AgentState, params: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
-        return "ok:service", {"queue": {"queue_id": params.get("queue_id", "default"), "action": "service"}}
+        return OK_SERVICE, {"queue": {"queue_id": params.get("queue_id", "default"), "action": "service"}}
 
     def apply_interaction(self, interaction: Interaction) -> Outcome:
         # lifecycle: pre_validate -> rule_validate -> resolve -> rule_after -> emit_event -> invariant_check
@@ -186,7 +197,7 @@ class SimulationRuntime:
 
         handler = self._handlers.get(interaction.action)
         if handler is None:
-            result, action_delta = "ok:noop", {}
+            result, action_delta = OK_NOOP, {}
         else:
             result, action_delta = handler(agent, interaction.params)
         delta.update(action_delta)

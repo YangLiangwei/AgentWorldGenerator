@@ -9,6 +9,8 @@ class ActionSpec:
     name: str
     cost: int = 1
     params: List[str] = field(default_factory=list)
+    success_code: str = "ok:generic"
+    failure_codes: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -40,7 +42,13 @@ class WorldSpec:
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "WorldSpec":
         actions = {
-            k: ActionSpec(name=k, cost=v.get("cost", 1), params=v.get("params", []))
+            k: ActionSpec(
+                name=k,
+                cost=v.get("cost", 1),
+                params=v.get("params", []),
+                success_code=v.get("success_code", f"ok:{k}"),
+                failure_codes=v.get("failure_codes", []),
+            )
             for k, v in data["actions"].items()
         }
         agents = {

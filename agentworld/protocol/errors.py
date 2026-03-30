@@ -1,0 +1,11 @@
+OK_GATHER = "ok:gather"
+OK_REST = "ok:rest"
+OK_MOVE = "ok:move"
+OK_TRANSFER = "ok:transfer"
+OK_ENQUEUE = "ok:enqueue"
+OK_SERVICE = "ok:service"
+OK_NOOP = "ok:noop"
+
+ERR_NO_RESOURCE = "fail:no_resource"
+ERR_UNKNOWN_LOCATION = "fail:unknown_location"
+ERR_VALIDATION = "fail:validation"

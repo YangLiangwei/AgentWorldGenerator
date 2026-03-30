@@ -6,12 +6,17 @@ from ..schema.world import WorldSpec
 
 
 DEFAULT_ACTIONS = {
-    "gather": {"cost": 1, "params": ["resource"]},
-    "rest": {"cost": 0, "params": []},
-    "move": {"cost": 1, "params": ["location"]},
-    "transfer": {"cost": 1, "params": ["target_id", "resource", "amount"]},
-    "enqueue": {"cost": 0, "params": ["queue_id"]},
-    "service": {"cost": 0, "params": ["queue_id"]},
+    "gather": {"cost": 1, "params": ["resource"], "success_code": "ok:gather", "failure_codes": ["fail:no_resource"]},
+    "rest": {"cost": 0, "params": [], "success_code": "ok:rest", "failure_codes": []},
+    "move": {"cost": 1, "params": ["location"], "success_code": "ok:move", "failure_codes": ["fail:unknown_location"]},
+    "transfer": {
+        "cost": 1,
+        "params": ["target_id", "resource", "amount"],
+        "success_code": "ok:transfer",
+        "failure_codes": ["fail:validation"],
+    },
+    "enqueue": {"cost": 0, "params": ["queue_id"], "success_code": "ok:enqueue", "failure_codes": ["fail:validation"]},
+    "service": {"cost": 0, "params": ["queue_id"], "success_code": "ok:service", "failure_codes": ["fail:validation"]},
 }
 
 ROLE_LIBRARY: Dict[str, Dict[str, Any]] = {
