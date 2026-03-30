@@ -4,7 +4,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Tuple
 
 from .events import Event, EventLog, Interaction, Outcome
-from ..rules import AccessRule, QueueRule, TransferRule
+from ..rules import AccessRule, QueueRule, TransferRule, validate_rule_pack_config
 from ..schema.world import AgentState, WorldSpec, WorldState
 
 
@@ -41,9 +41,16 @@ class SimulationRuntime:
         self.register_action_handler("service", self._handle_service)
 
     def _register_default_rules(self) -> None:
-        queue_cfg = self.spec.rules.get("queue", {}) if isinstance(self.spec.rules, dict) else {}
-        access_cfg = self.spec.rules.get("access", {}) if isinstance(self.spec.rules, dict) else {}
-        transfer_enabled = bool(self.spec.rules.get("transfer", True)) if isinstance(self.spec.rules, dict) else True
+        cfg = self.spec.rules if isinstance(self.spec.rules, dict) else {}
+        cfg_issues = validate_rule_pack_config(cfg)
+        errors = [i for i in cfg_issues if i.level == "error"]
+        if errors:
+            raise ValidationError("invalid rule pack config: " + "; ".join(i.message for i in errors))
+
+        queue_cfg = cfg.get("queue", {})
+        access_cfg = cfg.get("access", {})
+        transfer_cfg = cfg.get("transfer", True)
+        transfer_enabled = bool(transfer_cfg if isinstance(transfer_cfg, bool) else transfer_cfg.get("enabled", True))
 
         self._rules.append(QueueRule(queue_map=queue_cfg.get("queues", {})))
         self._rules.append(AccessRule(policies=access_cfg.get("policies", {})))
