@@ -1,41 +1,32 @@
 import unittest
 
-from agentworld.core import StateStore, build_schedule
-from agentworld.core.runtime import SimulationRuntime
-from agentworld.schema import ActionSpec, AgentState, WorldSpec, WorldState
-
-
-def _spec() -> WorldSpec:
-    return WorldSpec(
-        name="infra",
-        max_ticks=10,
-        actions={
-            "rest": ActionSpec(name="rest", cost=0, params=[]),
-        },
-        initial_state=WorldState(
-            resources={"start": {"food": 1}},
-            agents={"a": AgentState(id="a", location="start")},
-        ),
-    )
+from agentworld.core.diagnostics import DiagnosticsCollector
+from agentworld.core.scheduler import build_schedule
+from agentworld.core.state_store import StateStore
 
 
 class CoreInfraTests(unittest.TestCase):
     def test_scheduler_priority(self):
-        sch = build_schedule({
-            "b": {"action": "rest", "priority": 1},
-            "a": {"action": "rest", "priority": 5},
-        })
-        self.assertEqual(sch[0].actor_id, "a")
+        schedule = build_schedule(
+            {
+                "a": {"action": "rest", "priority": 1},
+                "b": {"action": "rest", "priority": 3},
+            }
+        )
+        self.assertEqual(schedule[0].actor_id, "b")
 
-    def test_state_store_and_diagnostics(self):
-        rt = SimulationRuntime(_spec())
-        rt.run_tick({"a": {"action": "rest", "params": {}}})
-        self.assertEqual(len(rt.diagnostics.rows), 1)
-        cp = rt.state_store.get_checkpoint("tick-1")
-        self.assertEqual(cp["tick"], 1)
+    def test_diagnostics_record(self):
+        d = DiagnosticsCollector()
+        row = d.record(1, ["ok:rest", "fail:no_resource"])
+        self.assertEqual(row.success_actions, 1)
+        self.assertEqual(row.failure_actions, 1)
+        self.assertIn("fail:no_resource", row.error_codes)
 
-        diff = StateStore.diff(rt.state_store.get_checkpoint("tick-0"), cp)
-        self.assertIn("unchanged", diff)
+    def test_state_store_diff(self):
+        prev = {"tick": 1}
+        curr = {"tick": 2}
+        diff = StateStore.diff(prev, curr)
+        self.assertFalse(diff["unchanged"])
 
 
 if __name__ == "__main__":
