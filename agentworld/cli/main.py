@@ -7,6 +7,7 @@ from pathlib import Path
 from ..agents import RuleAgent, build_profiles_from_world, load_profiles
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
+from ..orchestrator import Orchestrator, OrchestratorConfig, RunTask
 from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
 from ..replay import build_replay_html, load_jsonl, snapshot_state, summarize_events, write_run_artifacts
 from ..validators import validate_world_report
@@ -147,6 +148,35 @@ def cmd_diag(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_orchestrate(args: argparse.Namespace) -> int:
+    tasks_data = json.loads(Path(args.tasks).read_text())
+    orch = Orchestrator(
+        OrchestratorConfig(
+            max_concurrency=args.max_concurrency,
+            max_retries=args.max_retries,
+            max_ticks_per_task=args.max_ticks,
+        )
+    )
+    for t in tasks_data:
+        orch.submit(
+            RunTask(
+                task_id=t["task_id"],
+                world_path=t["world_path"],
+                ticks=int(t.get("ticks", 20)),
+                retries=int(t.get("retries", 1)),
+                artifact_dir=t.get("artifact_dir", ""),
+            )
+        )
+    results = orch.run_all()
+    out = [r.__dict__ for r in results]
+    if args.out:
+        Path(args.out).write_text(json.dumps(out, ensure_ascii=False, indent=2))
+        print(f"orchestrator_results: {args.out}")
+    else:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     data = json.loads(Path(args.world).read_text())
     report = validate_world_report(data)
@@ -245,6 +275,14 @@ def main() -> int:
     p_diag = sub.add_parser("diag", help="Summarize run diagnostics from artifacts")
     p_diag.add_argument("artifact_dir")
     p_diag.set_defaults(func=cmd_diag)
+
+    p_orch = sub.add_parser("orchestrate", help="Run queued tasks with retries and quotas")
+    p_orch.add_argument("tasks", help="json file containing task list")
+    p_orch.add_argument("--max-concurrency", type=int, default=1)
+    p_orch.add_argument("--max-retries", type=int, default=2)
+    p_orch.add_argument("--max-ticks", type=int, default=1000)
+    p_orch.add_argument("--out", default="")
+    p_orch.set_defaults(func=cmd_orchestrate)
 
     p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
     p_render.add_argument("world")
