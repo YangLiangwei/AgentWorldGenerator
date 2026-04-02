@@ -33,7 +33,8 @@ python -m unittest discover -s tests -q
 ```bash
 python -m agentworld.cli.main generate "a university world with labs and students" --out world.generated.json
 python -m agentworld.cli.main validate world.generated.json
-python -m agentworld.cli.main run world.generated.json --ticks 30 --log run.jsonl
+python -m agentworld.cli.main run world.generated.json --ticks 30 --log run.jsonl --artifact-dir artifacts
+python -m agentworld.cli.main diag artifacts
 python -m agentworld.cli.main render world.generated.json --agent agent_professor_1 --ticks 10 --out render_spec.json --context-out render_context.json --prompt-out image_prompt.txt
 ```
 

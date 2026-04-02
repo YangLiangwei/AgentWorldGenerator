@@ -3,7 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable, Dict, Tuple
 
+from .diagnostics import DiagnosticsCollector
+from .event_bus import EventBus
 from .events import Event, EventLog, Interaction, Outcome
+from .scheduler import build_schedule
+from .state_store import StateStore
 from ..protocol.errors import (
     ERR_NO_RESOURCE,
     ERR_UNKNOWN_LOCATION,
@@ -35,10 +39,15 @@ class SimulationRuntime:
         self.spec = spec
         self.state: WorldState = deepcopy(spec.initial_state)
         self.log = EventLog()
+        self.bus = EventBus()
+        self.state_store = StateStore()
+        self.diagnostics = DiagnosticsCollector()
+        self.cooldowns: Dict[str, Dict[str, int]] = {}
         self._handlers: Dict[str, ActionHandler] = {}
         self._rules = []
         self._register_default_handlers()
         self._register_default_rules()
+        self.state_store.checkpoint("tick-0", self)
 
     def register_action_handler(self, action: str, handler: ActionHandler) -> None:
         self._handlers[action] = handler
@@ -119,6 +128,9 @@ class SimulationRuntime:
                 raise ValidationError(f"missing action param: {required}")
         if self.state.agents[actor_id].energy < spec_action.cost:
             raise ValidationError("not enough energy")
+        cd = self.cooldowns.get(actor_id, {}).get(action, 0)
+        if cd > self.state.tick:
+            raise ValidationError(f"cooldown active: {action} until tick {cd}")
 
     def _rule_validate(self, actor_id: str, action: str, params: Dict[str, Any]) -> None:
         self._check_constraints(actor_id, action)
@@ -205,23 +217,34 @@ class SimulationRuntime:
         for rule in self._rules:
             rule.after_action(self, interaction.actor_id, interaction.action, interaction.params, result)
 
-        self.log.append(
-            Event(
-                tick=self.state.tick,
-                actor_id=interaction.actor_id,
-                action=interaction.action,
-                payload=interaction.params,
-                result=result,
-            )
+        cooldown = int(interaction.params.get("cooldown", 0))
+        if cooldown > 0 and result.startswith("ok:"):
+            self.cooldowns.setdefault(interaction.actor_id, {})[interaction.action] = self.state.tick + cooldown
+
+        event = Event(
+            tick=self.state.tick,
+            actor_id=interaction.actor_id,
+            action=interaction.action,
+            payload=interaction.params,
+            result=result,
         )
+        self.log.append(event)
+        self.bus.publish("event", {"tick": event.tick, "actor_id": event.actor_id, "action": event.action, "result": event.result})
 
         self._invariant_check()
-        return Outcome(tick=self.state.tick, interaction=interaction, result=result, state_delta=delta)
+        out = Outcome(tick=self.state.tick, interaction=interaction, result=result, state_delta=delta)
+        self.bus.publish("outcome", {"tick": out.tick, "result": out.result})
+        return out
 
     def end_tick(self) -> None:
         self.state.tick += 1
 
     def run_tick(self, decisions: Dict[str, Dict[str, Any]]) -> None:
-        for actor_id, cmd in decisions.items():
-            self.step_action(actor_id, cmd["action"], cmd.get("params", {}))
+        scheduled = build_schedule(decisions)
+        results = []
+        for it in scheduled:
+            out = self.step_action(it.actor_id, it.action, it.params)
+            results.append(out.result)
+        self.diagnostics.record(self.state.tick, results)
         self.end_tick()
+        self.state_store.checkpoint(f"tick-{self.state.tick}", self)

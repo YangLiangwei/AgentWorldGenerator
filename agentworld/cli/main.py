@@ -8,7 +8,7 @@ from ..agents import RuleAgent, build_profiles_from_world, load_profiles
 from ..compiler import compile_scene, draft_scene_ir_from_text
 from ..core import SimulationRuntime
 from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
-from ..replay import build_replay_html, snapshot_state, write_run_artifacts
+from ..replay import build_replay_html, load_jsonl, snapshot_state, summarize_events, write_run_artifacts
 from ..validators import validate_world_report
 
 
@@ -140,6 +140,13 @@ def cmd_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_diag(args: argparse.Namespace) -> int:
+    events = load_jsonl(str(Path(args.artifact_dir) / "run.jsonl"))
+    summary = summarize_events(events)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     data = json.loads(Path(args.world).read_text())
     report = validate_world_report(data)
@@ -234,6 +241,10 @@ def main() -> int:
     p_replay.add_argument("artifact_dir")
     p_replay.add_argument("--out", default="replay.html")
     p_replay.set_defaults(func=cmd_replay)
+
+    p_diag = sub.add_parser("diag", help="Summarize run diagnostics from artifacts")
+    p_diag.add_argument("artifact_dir")
+    p_diag.set_defaults(func=cmd_diag)
 
     p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
     p_render.add_argument("world")
