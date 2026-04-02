@@ -11,6 +11,7 @@ Agent-native simulation world engine + generator (MVP).
 - `agentworld/protocol`: protocol versions + upgrader/validator entrypoints (RenderContext + ActionSchema)
 - `agentworld/cli`: command-line entry (`awg`)
 - `agentworld/rules`: reusable rule middleware (queue/access/transfer)
+- `agentworld/plugins`: plugin contracts + registry (RulePack/ActionPack/RenderPack)
 
 ## Atomic World Contract
 
