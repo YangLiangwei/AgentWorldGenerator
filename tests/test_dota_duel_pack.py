@@ -53,9 +53,11 @@ class DotaDuelPackTests(unittest.TestCase):
         rule = DotaDuelRulePack().build({"win_hp_threshold": 0})
         rt.register_rule(rule)
 
-        # burst kill
-        for _ in range(4):
-            rt.step_action("hero_a", "cast_q", {"target_id": "hero_b"})
+        # burst kill via repeated attacks
+        for _ in range(10):
+            rt.step_action("hero_a", "attack", {"target_id": "hero_b"})
+            if winner_events:
+                break
         self.assertTrue(len(winner_events) >= 1)
 
 

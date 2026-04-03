@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 class DotaDuelRulePack:
     name = "dota_duel_lite_rules"
-    version = "0.1"
+    version = "0.2"
 
     def config_schema(self) -> Dict[str, Any]:
         return {
