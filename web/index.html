@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgentWorld · Dota Duel Lite</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#141b33;
+      --panel-2:#1b2442;
+      --text:#e9eeff;
+      --muted:#9ca8d4;
+      --accent:#6ea8fe;
+      --accent-2:#9d7bff;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --border:rgba(255,255,255,.12);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:radial-gradient(1200px 600px at 70% -10%, #22315f 0%, var(--bg) 55%);
+      color:var(--text);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    }
+    .app{max-width:1100px;margin:24px auto;padding:0 14px}
+    .title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .title h1{margin:0;font-size:22px;letter-spacing:.3px}
+    .badge{padding:4px 10px;border-radius:999px;background:rgba(34,197,94,.18);color:#b7f7ca;border:1px solid rgba(34,197,94,.45);font-size:12px}
+
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .card h3{margin:0 0 10px 0;font-size:14px;color:#d9e1ff;font-weight:600}
+    .muted{color:var(--muted);font-size:12px}
+
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    input{
+      background:#0d1430;border:1px solid var(--border);color:var(--text);
+      border-radius:10px;padding:10px 12px;outline:none
+    }
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(110,168,254,.22)}
+    .path{width:min(680px,100%)}
+    .small{width:120px}
+
+    button{
+      border:1px solid transparent;border-radius:10px;padding:10px 12px;
+      color:white;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      cursor:pointer;font-weight:600
+    }
+    button.secondary{background:#243256;border-color:var(--border)}
+    button:hover{filter:brightness(1.06)}
+
+    .actions{display:flex;flex-direction:column;gap:8px}
+    .action-btn{text-align:left;background:#1d2a4d;border:1px solid var(--border)}
+    .action-title{font-weight:700}
+    .action-desc{font-size:12px;color:var(--muted)}
+
+    pre{
+      margin:0;background:#0d1430;border:1px solid var(--border);border-radius:10px;
+      padding:12px;white-space:pre-wrap;max-height:300px;overflow:auto;font-size:12px
+    }
+    .log-ok{color:var(--ok)}
+    .log-bad{color:var(--danger)}
+    .footer{margin-top:12px;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="title">
+      <h1>AgentWorld · Dota Duel Lite Console</h1>
+      <div class="badge" id="health">checking...</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>World Setup</h3>
+        <div class="row">
+          <input id="world" class="path" value="/home/liangwei/.openclaw/workspace-a8/examples/world_dota_cm_lina.json" placeholder="/absolute/path/to/world.json" />
+          <button onclick="initWorld()">Init World</button>
+          <button class="secondary" onclick="refreshState()">Refresh</button>
+        </div>
+        <div class="footer">Tip: init once, then keep selecting actions below.</div>
+      </div>
+
+      <div class="card">
+        <h3>Control</h3>
+        <div class="row">
+          <input id="actor" class="small" value="cm" />
+          <input id="target" class="small" value="lina" />
+          <button onclick="propose()">Propose 3 Actions</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Actor and target must exist in current world state.</div>
+      </div>
+
+      <div class="card">
+        <h3>Action Options</h3>
+        <div id="actions" class="actions"><div class="muted">No proposals yet.</div></div>
+      </div>
+
+      <div class="card">
+        <h3>State Snapshot</h3>
+        <pre id="state">{}</pre>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h3>Logs</h3>
+        <pre id="logs"></pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+const logs = document.getElementById('logs');
+const health = document.getElementById('health');
+function log(x, ok=true){
+  const line = typeof x === 'string' ? x : JSON.stringify(x,null,2);
+  const mark = ok ? '✅' : '❌';
+  logs.textContent = `${mark} ${line}\n\n` + logs.textContent;
+}
+
+async function api(path, method='GET', body=null){
+  const r = await fetch('/api'+path, {
+    method,
+    headers: {'Content-Type':'application/json'},
+    body: body ? JSON.stringify(body) : null
+  });
+  const text = await r.text();
+  let j = null;
+  try { j = JSON.parse(text); } catch (_) {}
+  if(!r.ok){
+    const msg = (j && j.error) ? j.error : (text || `HTTP ${r.status}`);
+    throw new Error(msg);
+  }
+  if(!j){
+    throw new Error(`non-json response: ${text.slice(0,120)}`);
+  }
+  return j;
+}
+
+async function checkHealth(){
+  try{
+    await api('/health');
+    health.textContent='backend online';
+    health.style.background='rgba(34,197,94,.18)';
+    health.style.borderColor='rgba(34,197,94,.45)';
+    health.style.color='#b7f7ca';
+  }catch(e){
+    health.textContent='backend offline';
+    health.style.background='rgba(239,68,68,.18)';
+    health.style.borderColor='rgba(239,68,68,.45)';
+    health.style.color='#ffc1c1';
+  }
+}
+
+async function initWorld(){
+  try{
+    const world_path = document.getElementById('world').value.trim();
+    const res = await api('/init','POST',{world_path});
+    log(res,true);
+    await refreshState();
+  }catch(e){ log(e.message,false); }
+}
+
+async function refreshState(){
+  try{
+    const res = await api('/state');
+    document.getElementById('state').textContent = JSON.stringify(res,null,2);
+  }catch(e){ log(e.message,false); }
+}
+
+function renderActionButtons(proposals, actor){
+  const box = document.getElementById('actions');
+  if(!proposals.length){
+    box.innerHTML = '<div class="muted">No valid proposals.</div>';
+    return;
+  }
+  box.innerHTML = '';
+  proposals.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.innerHTML = `<div class="action-title">${i+1}. ${p.action} ${JSON.stringify(p.params)}</div>
+                     <div class="action-desc">${p.rationale || ''} · ${p.expected || ''}</div>`;
+    btn.onclick = async () => {
+      try{
+        const out = await api('/act','POST',{actor, action:p.action, params:p.params});
+        log(out,true);
+        await refreshState();
+      }catch(e){ log(e.message,false); }
+    };
+    box.appendChild(btn);
+  });
+}
+
+async function propose(){
+  try{
+    const actor = document.getElementById('actor').value.trim();
+    const target = document.getElementById('target').value.trim();
+    const res = await api('/propose','POST',{actor,target});
+    log(res,true);
+    renderActionButtons(res.proposals||[], actor);
+  }catch(e){ log(e.message,false); }
+}
+
+checkHealth();
+setInterval(checkHealth, 8000);
+</script>
+</body>
+</html>
