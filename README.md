@@ -39,6 +39,9 @@ python -m agentworld.cli.main run world.generated.json --ticks 30 --log run.json
 python -m agentworld.cli.main diag artifacts
 python -m agentworld.cli.main orchestrate tasks.json --out orch_results.json
 python -m agentworld.cli.main render world.generated.json --agent agent_professor_1 --ticks 10 --out render_spec.json --context-out render_context.json --prompt-out image_prompt.txt
+# Dota pack step interaction (propose 3 actions, optionally execute one)
+python -m agentworld.cli.main play-step world.generated.json --actor cm --target lina
+python -m agentworld.cli.main play-step world.generated.json --actor cm --target lina --select 0
 ```
 
 `render_context.json` now follows **RenderContext v0.2** (`agentworld/rendering/render_context_v0_2.schema.json`),

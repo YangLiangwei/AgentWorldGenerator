@@ -6,8 +6,9 @@ from pathlib import Path
 
 from ..agents import RuleAgent, build_profiles_from_world, load_profiles
 from ..compiler import compile_scene, draft_scene_ir_from_text
-from ..core import SimulationRuntime
+from ..core import SimulationRuntime, validate_proposals
 from ..orchestrator import Orchestrator, OrchestratorConfig, RunTask
+from ..packs.dota_duel_lite import DotaDuelActionPack, propose_dota_actions
 from ..rendering import build_image_prompt_from_context, build_render_context, build_render_spec
 from ..replay import build_replay_html, load_jsonl, snapshot_state, summarize_events, write_run_artifacts
 from ..validators import validate_world_report
@@ -177,6 +178,32 @@ def cmd_orchestrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_play_step(args: argparse.Namespace) -> int:
+    data = json.loads(Path(args.world).read_text())
+    spec = compile_scene(data)
+    rt = SimulationRuntime(spec)
+    DotaDuelActionPack().register_handlers(rt)
+
+    if args.actor not in rt.state.agents or args.target not in rt.state.agents:
+        print("play-step aborted: actor or target not found")
+        return 1
+
+    proposals = propose_dota_actions(rt, args.actor, args.target)
+    proposals = validate_proposals(rt, args.actor, proposals)
+    if not proposals:
+        print("no valid proposals")
+        return 1
+
+    if args.select < 0 or args.select >= len(proposals):
+        print(json.dumps([p.__dict__ for p in proposals], ensure_ascii=False, indent=2))
+        return 0
+
+    chosen = proposals[args.select]
+    out = rt.step_action(args.actor, chosen.action, chosen.params)
+    print(json.dumps({"chosen": chosen.__dict__, "outcome": out.result, "delta": out.state_delta}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     data = json.loads(Path(args.world).read_text())
     report = validate_world_report(data)
@@ -283,6 +310,14 @@ def main() -> int:
     p_orch.add_argument("--max-ticks", type=int, default=1000)
     p_orch.add_argument("--out", default="")
     p_orch.set_defaults(func=cmd_orchestrate)
+
+    p_step = sub.add_parser("play-step", help="NL-style control: propose 3 actions and optionally execute one (Dota pack demo)")
+    p_step.add_argument("world")
+    p_step.add_argument("--actor", required=True)
+    p_step.add_argument("--target", required=True)
+    p_step.add_argument("--nl", default="")
+    p_step.add_argument("--select", type=int, default=-1, help="index of proposal to execute; -1 prints proposals only")
+    p_step.set_defaults(func=cmd_play_step)
 
     p_render = sub.add_parser("render", help="Build render spec and text2image prompt from agent observation")
     p_render.add_argument("world")
