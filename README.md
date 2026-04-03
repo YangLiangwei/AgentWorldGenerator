@@ -12,6 +12,7 @@ Agent-native simulation world engine + generator (MVP).
 - `agentworld/cli`: command-line entry (`awg`)
 - `agentworld/rules`: reusable rule middleware (queue/access/transfer)
 - `agentworld/plugins`: plugin contracts + registry (RulePack/ActionPack/RenderPack)
+- `agentworld/packs`: content packs (kept separate from core), e.g. `dota_duel_lite`
 
 ## Atomic World Contract
 

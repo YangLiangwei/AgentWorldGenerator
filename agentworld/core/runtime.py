@@ -52,6 +52,9 @@ class SimulationRuntime:
     def register_action_handler(self, action: str, handler: ActionHandler) -> None:
         self._handlers[action] = handler
 
+    def register_rule(self, rule: Any) -> None:
+        self._rules.append(rule)
+
     def _register_default_handlers(self) -> None:
         self.register_action_handler("gather", self._handle_gather)
         self.register_action_handler("rest", self._handle_rest)
